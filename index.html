@@ -55,7 +55,7 @@
 				constructor (x, y, z) {
 					this.x = x;
 					this.y = y;
-					this.z = z;
+					this.z = z ? z : 0;
 				}
 
 				static fromArray (arr) {
@@ -75,6 +75,22 @@
 						this.x - v.x,
 						this.y - v.y,
 						this.z - v.z
+					)
+				}
+
+				plus(v) {
+					return new Vector(
+						this.x + v.x,
+						this.y + v.y,
+						this.z + v.z
+					)
+				}
+
+				multiply(num) {
+					return new Vector(
+						this.x * num,
+						this.y * num,
+						this.z * num
 					)
 				}
 
@@ -116,7 +132,7 @@
 					const draw = (x, y, color) => {
 						ctx.fillStyle = 
 							"rgba("+color[0]+","+color[1]+","+color[2]+", "+(color[3]/255)+")";
-						ctx.fillRect(Math.floor(x + + 0.00000000000001), Math.floor(y + + 0.00000000000001), 1, 1);
+						ctx.fillRect(Math.floor(x + 0.00000000000001), Math.floor(y + 0.00000000000001), 1, 1);
 					}
 					
 					const line = (x0, y0, x1, y1, color) => {
@@ -149,67 +165,78 @@
 						}
 					}
 
-					const triangle = (x0, y0, x1, y1, x2, y2, color) => {
-						x0 = Math.floor(x0);
-						y0 = Math.floor(y0);
-						x1 = Math.floor(x1);
-						y1 = Math.floor(y1);
-						x2 = Math.floor(x2);
-						y2 = Math.floor(y2);
-						if (y0 > y1) {
-							[x0, y0, x1, y1] = [x1, y1, x0, y0];
+					const triangle = (v0, v1, v2, color, zbuffer) => {
+						v0.x = Math.floor(v0.x);
+						v0.y = Math.floor(v0.y);
+						v1.x = Math.floor(v1.x);
+						v1.y = Math.floor(v1.y);
+						v2.x = Math.floor(v2.x);
+						v2.y = Math.floor(v2.y);
+						if (v0.y === v1.y && v0.y === v2.y) {
+							return;
 						}
-						if (y0 > y2) {
-							[x0, y0, x2, y2] = [x2, y2, x0, y0];
+						if (v0.y > v1.y) {
+							[v0.x, v0.y, v1.x, v1.y] = [v1.x, v1.y, v0.x, v0.y];
 						}
-						if (y1 > y2) {
-							[x1, y1, x2, y2] = [x2, y2, x1, y1];
+						if (v0.y > v2.y) {
+							[v0.x, v0.y, v2.x, v2.y] = [v2.x, v2.y, v0.x, v0.y];
 						}
-						const height = y2 - y0;
-						let currentHeight = y1 - y0 + 1;
-						for (let y = y0; y <= y1; y++) {
-							const alpha = (y - y0) / height;
-							const beta  = (y - y0) / currentHeight;
-							let xl = Math.floor(x0 + (x2 - x0) * alpha + 0.00000000000001);
-							let xr = Math.floor(x0 + (x1 - x0) * beta + 0.00000000000001);	
-							if (xl > xr) {
-								[xl, xr] = [xr, xl];
+						if (v1.y > v2.y) {
+							[v1.x, v1.y, v2.x, v2.y] = [v2.x, v2.y, v1.x, v1.y];
+						}
+						const height = v2.y - v0.y;
+						const firstHeight = v1.y - v0.y;
+						const secondHeight = v2.y - v1.y;
+						for (let i = 0; i < height; i++) {
+							const second_half = i > v1.y - v0.y || v1.y===v0.y;
+							const alpha = i / height;
+							let beta;
+							if (!second_half) {
+								beta = i / firstHeight;
+							} else {
+								beta  = (i - (v1.y-v0.y)) / secondHeight;
 							}
-							for (let x = xl; x <= xr; x++) {
-								draw(x, y, color);
+							let A = v0.plus(v2.minus(v0).multiply(alpha));
+							let B;
+							if (!second_half) {
+								B = v0.plus(v1.minus(v0).multiply(beta));
+							} else {
+								B = v1.plus(v2.minus(v1).multiply(beta));
+							}
+							if (A.x > B.x) {
+								[A, B] = [B, A];
+							}
+							for (let j = Math.floor(A.x + 0.00000000000001); j <= B.x; j++) {
+								const phi = A.x===B.x ? 1 : (j - A.x) / (B.x - A.x);
+								const P = A.plus(B.minus(A).multiply(phi));
+								P.x = j;
+								P.y = v0.y + i;
+								const idx = j + (v0.y + i ) * PICTURE_SIZE;
+								if (!zbuffer[idx] || zbuffer[idx] < P.z) {
+									zbuffer[idx] = P.z;
+									draw(P.x, P.y, color);
+								}
 							}
 						}
-						currentHeight = y2 - y1 + 1;
-						for (let y = y1; y <= y2; y++) {
-							const alpha = (y-y0) / height;
-							const beta  = (y-y1) / currentHeight;
-							let xl = Math.floor(x0 + (x2 - x0) * alpha + 0.00000000000001);
-							let xr = Math.floor(x1 + (x2 - x1) * beta + 0.00000000000001);	
-							if (xl > xr) {
-								[xl, xr] = [xr, xl];
-							}
-							for (let x = xl; x <= xr; x++) {
-								draw(x, y, color);
-							}
-							
-						}
-						// line(x0, y0, x1, y1, color);
-						// line(x1, y1, x2, y2, color);
-						// line(x0, y0, x2, y2, color);
 					}
 					
 					const white = [255, 255, 255, 255];
 					const red = [255, 0, 0, 255];
 					const green = [0, 255, 0, 255];
 
-					const one = [255,255,255,255];
-					const two = [200,200,200,255];
+					const one = [255, 255, 255, 255];
+					const two = [200, 200, 200, 255];
+
+					// triangle(new Vector(10,70,0), new Vector(50,160,100), new Vector(170, 80, 200), one);
+					// triangle(new Vector(180,50,0), new Vector(150,1,100), new Vector(70, 180, 200), one);
+					// triangle(new Vector(180,150,0), new Vector(120,160,100), new Vector(130, 180, 200), one);
 					
 					const [v, f] = file;
-					const lightDir = new Vector(0, -1, -1);
+					const lightDir = new Vector(0, 0, -1);
+					const zbuffer = [];
 					
 					for (let i = 0; i < f.length; i++) {
-					//for (let i = 0; i < 0; i++) {
+					// for (let i = 0; i < 0; i++) {
 						const v0 = new Vector(
 							(parseFloat(v[f[i][0][0] - 1][0]) + 1) * (PICTURE_SIZE/2),
 							(parseFloat(v[f[i][0][0] - 1][1]) + 1) * (PICTURE_SIZE/2),
@@ -230,9 +257,8 @@
 						const c = first.cross(second);
 						c.normalize();
 						const intensity = c.dotProduct(lightDir);
-						//console.log(v0.x, v0.y, v1.x, v1.y, v2.x, v2.y, [Math.round(intensity*255), Math.round(intensity*255), Math.round(intensity*255), 255])
 						if (intensity > 0) {
-							triangle(v0.x, v0.y, v1.x, v1.y, v2.x, v2.y, [Math.round(intensity*255), Math.round(intensity*255), Math.round(intensity*255), 255]);
+							triangle(v0, v1, v2, [Math.round(intensity*255), Math.round(intensity*255), Math.round(intensity*255), 255], zbuffer);
 						}
 					}
 				}
