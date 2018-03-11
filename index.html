@@ -3,6 +3,7 @@
 	<head>
 		<meta charset="utf-8"/>
 		<title>3d test</title>
+		<script type="text/javascript" src="tga.js"></script>
 		<script type="text/javascript">
 			'use strict';
 
@@ -23,6 +24,12 @@
 						case 'v ':
 							v.push(file[i].substr(2).split(' '));
 							break;
+						case 'vn':
+							vn.push(file[i].substr(2).split(' '));
+							break;
+						case 'vt':
+							vt.push(file[i].substr(2).split(' '))
+							break;	
 						case 'f ':
 							const face = file[i].substr(2).split(' ');
 							const faceArr = [];
@@ -33,7 +40,7 @@
 							break;
 					}
 				}
-				return [v, f];
+				return [v, f, vn, vt];
 			}
 			
 			function readTextFile(file, callback)
@@ -231,7 +238,7 @@
 					// triangle(new Vector(180,50,0), new Vector(150,1,100), new Vector(70, 180, 200), one);
 					// triangle(new Vector(180,150,0), new Vector(120,160,100), new Vector(130, 180, 200), one);
 					
-					const [v, f] = file;
+					const [v, f, vn, vt] = file;
 					const lightDir = new Vector(0, 0, -1);
 					const zbuffer = [];
 					
@@ -264,6 +271,23 @@
 				}
 				const b = performance.now();
 				console.log((b - a) + ' ms.');
+
+
+
+				const tga = new TGA();
+				tga.open("african_head_diffuse.tga", function(data) {
+					const canvas = tga.getCanvas();
+					const ctx = canvas.getContext('2d');
+					const imageData = ctx.getImageData(0,0, canvas.width, canvas.height);
+					let x = 300, y = 300;
+					const index = (x + y * canvas.width) * 4;
+					let color = [
+						imageData.data[index],
+						imageData.data[index + 1],
+						imageData.data[index + 2],
+						imageData.data[index + 3]
+					];
+				});
 			}
 
 		</script>
